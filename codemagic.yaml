@@ -1,0 +1,59 @@
+# Juan Rocha Boxe — compilações iOS no Codemagic (macOS na nuvem)
+# Coloque este arquivo na raiz do repositório, ao lado de pubspec.yaml.
+# O projeto nativo ios/ é gerado na compilação; não precisa existir no Git.
+workflows:
+  ios-verificacao:
+    name: "iOS — validar sem assinatura"
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: "Gerar projeto iOS e instalar dependências"
+        script: |
+          flutter create --platforms=ios --org br.juanrochaboxe --project-name juan_rocha_boxe .
+          flutter pub get
+          dart run flutter_launcher_icons
+      - name: "Analisar e testar Flutter"
+        script: |
+          flutter analyze --no-fatal-infos
+          flutter test
+      - name: "Compilar iOS sem assinatura"
+        script: flutter build ios --release --no-codesign
+    artifacts:
+      - build/ios/iphoneos/Runner.app
+      - /tmp/xcodebuild_logs/*.log
+
+  ios-ipa-assinado:
+    name: "iOS — gerar IPA para TestFlight (exige Apple Developer)"
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: br.juanrochaboxe.juanRochaBoxe
+    scripts:
+      - name: "Gerar projeto iOS e instalar dependências"
+        script: |
+          flutter create --platforms=ios --org br.juanrochaboxe --project-name juan_rocha_boxe .
+          flutter pub get
+          dart run flutter_launcher_icons
+      - name: "Analisar e testar Flutter"
+        script: |
+          flutter analyze --no-fatal-infos
+          flutter test
+      - name: "Configurar certificados e perfis da Apple"
+        script: xcode-project use-profiles
+      - name: "Gerar IPA assinado"
+        script: |
+          flutter build ipa --release \
+            --build-number="$BUILD_NUMBER" \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
