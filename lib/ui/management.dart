@@ -8,7 +8,6 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../core/repository.dart';
-import '../core/db.dart';
 import '../core/utils.dart';
 import 'forms.dart';
 import 'style.dart';
@@ -225,7 +224,7 @@ class _ReportsPageState extends State<ReportsPage>{
       final data=await Repository.instance.exportAll();
       final export={'app':'Juan Rocha Boxe','format_version':1,'exported_at':DateTime.now().toIso8601String(),'tables':data};
       final dir=await getTemporaryDirectory();
-      final file=File(p.join(dir,'backup_juan_rocha_${todayIso()}.json'));
+      final file=File(p.join(dir.path,'backup_juan_rocha_${todayIso()}.json'));
       await file.writeAsString(const JsonEncoder.withIndent('  ').convert(export));
       await SharePlus.instance.share(ShareParams(files:[XFile(file.path)],text:'Backup JR Boxe Gestão — guarde em local protegido.'));
     }catch(e){showJrError(context,e);}finally{if(mounted)setState(()=>busy=false);}
@@ -243,7 +242,7 @@ class _ReportsPageState extends State<ReportsPage>{
         return '"$escaped"';
       }
       final dir=await getTemporaryDirectory();
-      final file=File(p.join(dir,'alunos_juan_rocha_${todayIso()}.csv'));
+      final file=File(p.join(dir.path,'alunos_juan_rocha_${todayIso()}.csv'));
       await file.writeAsString('\uFEFF${out.map((row)=>row.map(csv).join(';')).join('\n')}');
       await SharePlus.instance.share(ShareParams(files:[XFile(file.path)]));
     }catch(e){showJrError(context,e);}finally{if(mounted)setState(()=>busy=false);}
