@@ -26,6 +26,27 @@ workflows:
       - build/ios/iphoneos/Runner.app
       - /tmp/xcodebuild_logs/*.log
 
+  ios-preview-simulador:
+    name: "iOS — visualizar no iPhone virtual"
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: "Gerar projeto iOS e instalar dependências"
+        script: |
+          flutter create --platforms=ios --org br.juanrochaboxe --project-name juan_rocha_boxe .
+          flutter pub get
+          dart run flutter_launcher_icons
+      - name: "Compilar aplicativo para simulador iOS"
+        script: |
+          flutter build ios --debug --simulator
+    artifacts:
+      - build/ios/iphonesimulator/Runner.app
+      - /tmp/xcodebuild_logs/*.log
+
   ios-ipa-assinado:
     name: "iOS — gerar IPA para TestFlight (exige Apple Developer)"
     instance_type: mac_mini_m2
