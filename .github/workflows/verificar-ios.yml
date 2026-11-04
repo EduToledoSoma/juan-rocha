@@ -1,0 +1,35 @@
+name: Verificar aplicativo iOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  validar-ios:
+    name: Flutter + compilação iOS sem assinatura
+    runs-on: macos-latest
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v6
+      - name: Preparar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Criar projeto nativo somente iOS
+        run: flutter create --platforms=ios --org br.juanrochaboxe --project-name juan_rocha_boxe .
+      - name: Instalar pacotes
+        run: flutter pub get
+      - name: Preparar o ícone da marca
+        run: dart run flutter_launcher_icons
+      - name: Analisar código
+        run: flutter analyze --no-fatal-infos
+      - name: Testar lógica Dart
+        run: flutter test
+      - name: Verificar build do iOS sem assinatura
+        run: flutter build ios --release --no-codesign
+
+# IMPORTANTE: build sem assinatura serve apenas para detectar erros de compilação.
+# Não gera IPA pronto para instalar. Para distribuir via TestFlight, é preciso
+# assinar o app com a conta Apple Developer e publicar no App Store Connect.
