@@ -1,13 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import '../core/repository.dart';
+import '../core/export_service.dart';
 import '../core/utils.dart';
 import 'forms.dart';
 import 'style.dart';
@@ -27,7 +23,7 @@ class ManagementTab extends StatelessWidget {
     const SizedBox(height:20),
     JrPanel(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       const Icon(Icons.info_outline,color:brandGold),const SizedBox(height:8),
-      const Text('Versão local para um iPhone',style:TextStyle(fontWeight:FontWeight.w800)),
+      const Text('Versão local para este dispositivo',style:TextStyle(fontWeight:FontWeight.w800)),
       const SizedBox(height:8),
       const Text('Os registros permanecem neste aparelho. Acesso por vários funcionários, autenticação, sincronização segura e restauração do backup ainda exigem um backend e testes antes de usar com dados reais de alunos.',style:TextStyle(fontSize:12,color:brandMuted)),
     ])),
@@ -43,7 +39,7 @@ Widget _menu(BuildContext context,IconData icon,String title,String subtitle,Wid
 class PlansPage extends StatefulWidget {const PlansPage({super.key});@override State<PlansPage> createState()=>_PlansPageState();}
 class _PlansPageState extends State<PlansPage>{
   late Future<List<Map<String,Object?>>> future;
-  @override void initState(){super.initState();reload();}void reload()=>future=Repository.instance.list('plans',orderBy:'active DESC,name');
+  @override void initState(){super.initState();reload();}void reload() { future=Repository.instance.list('plans',orderBy:'active DESC,name'); }
   Future<void> edit([Map<String,Object?>? item])async{
     final result=await editEntity(context,title:item==null?'Novo plano':'Editar plano',original:item,fields:const [
       FieldSpec('name','Nome do plano',mandatory:true),FieldSpec('modality','Modalidade',initial:'Boxe'),
@@ -85,7 +81,7 @@ const _leadStages=<String,String>{
 class LeadsPage extends StatefulWidget {const LeadsPage({super.key});@override State<LeadsPage> createState()=>_LeadsPageState();}
 class _LeadsPageState extends State<LeadsPage>{
   late Future<List<Map<String,Object?>>> future;
-  @override void initState(){super.initState();reload();}void reload()=>future=Repository.instance.list('leads');
+  @override void initState(){super.initState();reload();}void reload() { future=Repository.instance.list('leads'); }
   Future<void> edit([Map<String,Object?>? item])async{
     final result=await editEntity(context,title:item==null?'Novo interessado':'Editar interessado',original:item,fields:const [
       FieldSpec('name','Nome',mandatory:true),FieldSpec('phone','Telefone',kind:FieldKind.phone),
@@ -128,7 +124,7 @@ class _LeadsPageState extends State<LeadsPage>{
 class ProductsPage extends StatefulWidget {const ProductsPage({super.key});@override State<ProductsPage> createState()=>_ProductsPageState();}
 class _ProductsPageState extends State<ProductsPage>{
   late Future<List<Map<String,Object?>>> future;
-  @override void initState(){super.initState();reload();}void reload()=>future=Repository.instance.list('products');
+  @override void initState(){super.initState();reload();}void reload() { future=Repository.instance.list('products'); }
   Future<void> edit([Map<String,Object?>? item])async{
     final result=await editEntity(context,title:item==null?'Novo produto':'Editar produto',original:item,fields:const [
       FieldSpec('name','Produto',mandatory:true),FieldSpec('category','Categoria',kind:FieldKind.select,initial:'Uniformes',options:{'Uniformes':'Uniformes','Luvas':'Luvas','Acessórios':'Acessórios','Outros':'Outros'}),
@@ -162,7 +158,7 @@ class _ProductsPageState extends State<ProductsPage>{
 class AlertsPage extends StatefulWidget {const AlertsPage({super.key});@override State<AlertsPage> createState()=>_AlertsPageState();}
 class _AlertsPageState extends State<AlertsPage>{
   late Future<_AlertsData> future;
-  @override void initState(){super.initState();reload();}void reload()=>future=_AlertsData.load();
+  @override void initState(){super.initState();reload();}void reload() { future=_AlertsData.load(); }
   @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Alertas internos')),
     body:FutureBuilder<_AlertsData>(future:future,builder:(context,s){
       if(s.hasError)return JrEmpty(text:'Erro: ${s.error}');
@@ -223,10 +219,8 @@ class _ReportsPageState extends State<ReportsPage>{
     try{
       final data=await Repository.instance.exportAll();
       final export={'app':'Juan Rocha Boxe','format_version':1,'exported_at':DateTime.now().toIso8601String(),'tables':data};
-      final dir=await getTemporaryDirectory();
-      final file=File(p.join(dir.path,'backup_juan_rocha_${todayIso()}.json'));
-      await file.writeAsString(const JsonEncoder.withIndent('  ').convert(export));
-      await SharePlus.instance.share(ShareParams(files:[XFile(file.path)],text:'Backup JR Boxe Gestão — guarde em local protegido.'));
+      final saved=await deliverExport(filename:'backup_juan_rocha_${todayIso()}.json', bytes:utf8.encode(const JsonEncoder.withIndent('  ').convert(export)),message:'Backup JR Boxe Gestão — guarde em local protegido.');
+      if(saved!=null && mounted)showJrOk(context,'Backup salvo em: $saved');
     }catch(e){showJrError(context,e);}finally{if(mounted)setState(()=>busy=false);}
   }
   Future<void> exportCsv()async{
@@ -241,10 +235,9 @@ class _ReportsPageState extends State<ReportsPage>{
         final escaped = x.replaceAll('"', '""');
         return '"$escaped"';
       }
-      final dir=await getTemporaryDirectory();
-      final file=File(p.join(dir.path,'alunos_juan_rocha_${todayIso()}.csv'));
-      await file.writeAsString('\uFEFF${out.map((row)=>row.map(csv).join(';')).join('\n')}');
-      await SharePlus.instance.share(ShareParams(files:[XFile(file.path)]));
+      final csvData='\uFEFF${out.map((row)=>row.map(csv).join(';')).join('\n')}';
+      final saved=await deliverExport(filename:'alunos_juan_rocha_${todayIso()}.csv',bytes:utf8.encode(csvData));
+      if(saved!=null && mounted)showJrOk(context,'CSV salvo em: $saved');
     }catch(e){showJrError(context,e);}finally{if(mounted)setState(()=>busy=false);}
   }
   Future<void> exportPdf()async{
@@ -266,9 +259,10 @@ class _ReportsPageState extends State<ReportsPage>{
         }.entries.map((e)=>pw.Padding(padding:const pw.EdgeInsets.symmetric(vertical:5),child:pw.Row(mainAxisAlignment:pw.MainAxisAlignment.spaceBetween,children:[pw.Text(e.key),pw.Text(e.value)]))),
         pw.SizedBox(height:20),pw.Text('Frequência registrada por mês',style:pw.TextStyle(fontWeight:pw.FontWeight.bold)),
         ...frequency.map((r)=>pw.Text('${r['month']}: ${r['present']} presentes / ${r['total']} registros')),
-        pw.SizedBox(height:20),pw.Text('Gerado a partir do banco de dados local deste aparelho.',style:const pw.TextStyle(fontSize:9)),
+        pw.SizedBox(height:20),pw.Text('Gerado a partir do banco de dados local deste dispositivo.',style:const pw.TextStyle(fontSize:9)),
       ]));
-      await Printing.sharePdf(bytes:await pdf.save(),filename:'relatorio_juan_rocha_${todayIso()}.pdf');
+      final saved=await deliverExport(filename:'relatorio_juan_rocha_${todayIso()}.pdf',bytes:await pdf.save());
+      if(saved!=null && mounted)showJrOk(context,'PDF salvo em: $saved');
     }catch(e){showJrError(context,e);}finally{if(mounted)setState(()=>busy=false);}
   }
   @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Relatórios e exportação')),
@@ -282,7 +276,7 @@ class _ReportsPageState extends State<ReportsPage>{
       ])),
       if(busy)const Padding(padding:EdgeInsets.all(20),child:Center(child:CircularProgressIndicator())),
       const SizedBox(height:20),const Text('Persistência local',style:TextStyle(fontSize:19,fontWeight:FontWeight.w800)),
-      const SizedBox(height:9),const Text('O banco SQLite guarda alunos, pagamentos, turmas, frequência, produtos e contatos neste iPhone. A remoção do app pode apagar os dados: faça exportações frequentes.',style:TextStyle(color:brandMuted)),
+      const SizedBox(height:9),const Text('O banco SQLite guarda alunos, pagamentos, turmas, frequência, produtos e contatos neste dispositivo. A remoção do app pode apagar os dados: faça exportações frequentes.',style:TextStyle(color:brandMuted)),
     ]));
 }
 class AuditPage extends StatelessWidget {

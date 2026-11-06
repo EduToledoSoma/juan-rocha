@@ -1,0 +1,64 @@
+name: Gerar aplicativo desktop - Linux e Windows
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'lib/**'
+      - 'pubspec.yaml'
+      - 'assets/**'
+      - 'test/**'
+      - '.github/workflows/gerar-desktop.yml'
+
+jobs:
+  linux:
+    name: Compilar Linux
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencias de Linux desktop
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libsqlite3-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Criar plataforma e instalar dependencias
+        run: |
+          flutter config --enable-linux-desktop
+          flutter create --platforms=linux,windows --project-name juan_rocha_boxe .
+          flutter pub get
+      - name: Testes
+        run: |
+          flutter analyze --no-fatal-infos
+          flutter test
+      - name: Compilar Linux
+        run: flutter build linux --release
+      - name: Publicar aplicativo Linux
+        uses: actions/upload-artifact@v4
+        with:
+          name: JuanRochaBoxe-Linux
+          path: build/linux/x64/release/bundle/
+          if-no-files-found: error
+
+  windows:
+    name: Compilar Windows
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Criar plataforma e instalar dependencias
+        shell: pwsh
+        run: |
+          flutter config --enable-windows-desktop
+          flutter create --platforms=linux,windows --project-name juan_rocha_boxe .
+          Copy-Item "assets/brand/app_icon_windows.ico" "windows/runner/resources/app_icon.ico" -Force
+          flutter pub get
+      - name: Compilar Windows
+        run: flutter build windows --release
+      - name: Publicar aplicativo Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: JuanRochaBoxe-Windows
+          path: build/windows/x64/runner/Release/
+          if-no-files-found: error

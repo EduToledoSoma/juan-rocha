@@ -1,15 +1,39 @@
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:path_provider/path_provider.dart';
 
 class AppDb {
   AppDb._();
   static final AppDb instance = AppDb._();
   Database? _db;
+  Future<Database>? _opening;
 
-  Future<Database> get database async {
-    if (_db != null) return _db!;
-    final dir = await getDatabasesPath();
+  /// On Linux and Windows sqflite uses the system SQLite via FFI.
+  /// Android/iOS keep the existing native sqflite implementation.
+  static void configurePlatform() {
+    if (Platform.isLinux || Platform.isWindows) {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    }
+  }
+
+  Future<Database> get database => _db != null
+      ? Future.value(_db!)
+      : (_opening ??= _openDatabase().catchError((Object error) {
+          _opening = null;
+          throw error;
+        }));
+
+  Future<Database> _openDatabase() async {
+    final String dir;
+    if (Platform.isLinux || Platform.isWindows) {
+      final support = await getApplicationSupportDirectory();
+      dir = p.join(support.path, 'JuanRochaBoxe', 'databases');
+    } else {
+      dir = await getDatabasesPath();
+    }
     await Directory(dir).create(recursive: true);
     _db = await openDatabase(
       p.join(dir, 'juan_rocha_boxe.sqlite'),

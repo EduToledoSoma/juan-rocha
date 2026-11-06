@@ -11,7 +11,7 @@ class AgendaTab extends StatefulWidget {
 class _AgendaTabState extends State<AgendaTab> {
   late Future<List<Map<String,Object?>>> future;
   @override void initState(){super.initState();reload();}
-  void reload()=>future=Repository.instance.list('classes',orderBy:'start_time, id');
+  void reload() { future=Repository.instance.list('classes',orderBy:'start_time, id'); }
 
   Future<void> editor([Map<String,Object?>? row]) async {
     final values=await editEntity(context,title:row==null?'Nova turma':'Editar turma',original:row,fields:const [
@@ -61,7 +61,7 @@ class _CheckinPageState extends State<CheckinPage> {
   int? classId;
   late Future<_CheckinData> future;
   @override void initState(){super.initState();reload();}
-  void reload()=>future=_CheckinData.load(date);
+  void reload() { future=_CheckinData.load(date); }
   @override Widget build(BuildContext context)=>Scaffold(
     appBar:AppBar(title:const Text('Controle de frequência')),
     body:FutureBuilder<_CheckinData>(future:future,builder:(context,s){

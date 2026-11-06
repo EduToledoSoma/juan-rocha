@@ -1,0 +1,80 @@
+name: Gerar instalador Windows - Juan Rocha Boxe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  instalar-windows:
+    name: Compilar Windows e gerar Setup.exe
+    runs-on: windows-2022
+    timeout-minutes: 60
+
+    steps:
+      - name: Baixar codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Criar plataforma Windows e dependencias
+        shell: pwsh
+        run: |
+          flutter config --enable-windows-desktop
+          flutter create --platforms=windows --project-name juan_rocha_boxe .
+          flutter pub get
+          if (!(Test-Path 'assets/brand/app_icon_windows.ico')) {
+            throw 'Logo do Windows nao encontrada: assets/brand/app_icon_windows.ico'
+          }
+          Copy-Item 'assets/brand/app_icon_windows.ico' 'windows/runner/resources/app_icon.ico' -Force
+
+      - name: Analisar e testar codigo
+        shell: pwsh
+        run: |
+          flutter analyze --no-fatal-infos
+          flutter test
+
+      - name: Compilar aplicativo Windows
+        shell: pwsh
+        run: |
+          flutter build windows --release
+          if (!(Test-Path 'build/windows/x64/runner/Release/juan_rocha_boxe.exe')) {
+            throw 'Executavel esperado nao localizado. Confira o nome do projeto Flutter.'
+          }
+          Copy-Item 'assets/brand/app_icon_windows.ico' 'build/windows/x64/runner/Release/app_icon.ico' -Force
+
+      - name: Instalar Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          $candidates = @(
+            'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
+            'C:\Program Files\Inno Setup 6\ISCC.exe'
+          )
+          $compiler = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $compiler) { throw 'ISCC.exe nao encontrado apos instalar Inno Setup.' }
+          "ISCC_PATH=$compiler" >> $env:GITHUB_ENV
+
+      - name: Criar instalador unico EXE
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          & $env:ISCC_PATH 'installer/juan_rocha.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Falha ao gerar o instalador Inno Setup.' }
+          if (!(Test-Path 'dist/Juan_Rocha_Boxe_Setup.exe')) {
+            throw 'Arquivo Setup.exe nao encontrado apos a compilacao.'
+          }
+          Get-Item 'dist/Juan_Rocha_Boxe_Setup.exe' | Select-Object Name, Length
+
+      - name: Disponibilizar instalador para download
+        uses: actions/upload-artifact@v4
+        with:
+          name: Juan-Rocha-Boxe-Instalador-Windows
+          path: dist/Juan_Rocha_Boxe_Setup.exe
+          if-no-files-found: error
+          retention-days: 14

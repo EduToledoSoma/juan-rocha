@@ -14,7 +14,7 @@ class _StudentsTabState extends State<StudentsTab> {
   String query=''; String filter='all';
   late Future<List<Map<String,Object?>>> future;
   @override void initState(){super.initState();reload();}
-  void reload()=>future=Repository.instance.studentList();
+  void reload() { future=Repository.instance.studentList(); }
 
   Future<void> editor([Map<String,Object?>? student]) async {
     try {
@@ -81,7 +81,7 @@ class StudentDetails extends StatefulWidget {
 class _StudentDetailsState extends State<StudentDetails> {
   late Future<_StudentInfo> future;
   @override void initState(){super.initState();reload();}
-  void reload()=>future=_StudentInfo.load(widget.studentId);
+  void reload() { future=_StudentInfo.load(widget.studentId); }
 
   Future<void> generateInvoice(Map<String,Object?> student) async {
     try {

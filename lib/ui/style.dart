@@ -57,14 +57,51 @@ class JrEmpty extends StatelessWidget {
 }
 
 class JrStat extends StatelessWidget {
-  const JrStat({super.key,required this.label,required this.value,required this.icon,this.danger=false});
-  final String label,value; final IconData icon; final bool danger;
-  @override Widget build(BuildContext context)=>JrPanel(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-    Icon(icon,color:danger?brandRed:brandGold,size:23),
-    const SizedBox(height:13),
-    Text(value,style:TextStyle(color:danger?brandRed:Colors.white,fontSize:23,fontWeight:FontWeight.w900),maxLines:1),
-    const SizedBox(height:5),Text(label,style:const TextStyle(color:brandMuted,fontSize:12)),
-  ]));
+  const JrStat({super.key,required this.label,required this.value,required this.icon,
+    this.danger=false,this.onTap});
+  final String label,value;
+  final IconData icon;
+  final bool danger;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(height:168,child:Material(
+    color:brandSurface,
+    borderRadius:BorderRadius.circular(19),
+    child:InkWell(
+      onTap:onTap,
+      borderRadius:BorderRadius.circular(19),
+      child:Container(
+        padding:const EdgeInsets.all(13),
+        decoration:BoxDecoration(
+          border:Border.all(color:danger?brandGold:const Color(0xFF373127)),
+          borderRadius:BorderRadius.circular(19),
+        ),
+        child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[
+            Icon(icon,color:brandGold,size:25),
+            if(onTap!=null)const Icon(Icons.arrow_outward_rounded,color:brandGoldLight,size:19),
+          ]),
+          const Spacer(),
+          SizedBox(height:34,child:Align(alignment:Alignment.centerLeft,child:FittedBox(
+            fit:BoxFit.scaleDown,alignment:Alignment.centerLeft,
+            child:Text(value,maxLines:1,style:const TextStyle(
+              color:brandGoldLight,fontSize:27,fontWeight:FontWeight.w900)),
+          ))),
+          const SizedBox(height:9),
+          Container(
+            constraints:const BoxConstraints(minHeight:38),
+            width:double.infinity,
+            padding:const EdgeInsets.symmetric(horizontal:9,vertical:6),
+            decoration:BoxDecoration(color:brandGoldLight,borderRadius:BorderRadius.circular(9)),
+            alignment:Alignment.centerLeft,
+            child:Text(label,maxLines:2,overflow:TextOverflow.ellipsis,
+              style:const TextStyle(color:brandBlack,fontSize:11,fontWeight:FontWeight.w900,height:1.15)),
+          ),
+        ]),
+      ),
+    ),
+  ));
 }
 
 void showJrError(BuildContext context, Object error) {

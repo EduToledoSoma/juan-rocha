@@ -1,5 +1,5 @@
 name: juan_rocha_boxe
-description: Gestão local de alunos, turmas e financeiro do CT Juan Rocha Boxe para iOS.
+description: Gestão local do CT Juan Rocha Boxe para Android, iOS, Linux e Windows.
 publish_to: none
 version: 1.0.0+1
 
@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   sqflite: ^2.4.2+1
+  sqflite_common_ffi: ^2.4.5
   path: ^1.9.1
   path_provider: ^2.1.5
   intl: ^0.20.2
@@ -30,6 +31,6 @@ flutter:
 
 flutter_launcher_icons:
   ios: true
-  android: false
+  android: true
   image_path: 'assets/brand/icone_ios.png'
   remove_alpha_ios: true

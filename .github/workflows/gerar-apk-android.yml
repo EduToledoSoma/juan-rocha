@@ -1,0 +1,69 @@
+name: Gerar APK Android - Juan Rocha Boxe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/gerar-apk-android.yml'
+      - 'lib/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - 'test/**'
+
+permissions:
+  contents: read
+
+jobs:
+  criar-apk:
+    name: Compilar e disponibilizar APK Android de teste
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Instalar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Criar estrutura nativa Android
+        run: flutter create --platforms=android --org br.juanrochaboxe --project-name juan_rocha_boxe .
+      - name: Nome visível no Android
+        run: |
+          python3 - <<'PYANDROID'
+          from pathlib import Path
+          file = Path('android/app/src/main/AndroidManifest.xml')
+          xml = file.read_text(encoding='utf-8')
+          old = 'android:label="juan_rocha_boxe"'
+          if old not in xml:
+              raise SystemExit('Etiqueta Android inesperada: confira AndroidManifest.xml')
+          file.write_text(xml.replace(old, 'android:label="Juan Rocha Boxe"'), encoding='utf-8')
+          PYANDROID
+      - name: Instalar dependências Flutter
+        run: flutter pub get
+      - name: Gerar ícone Android com a logo do CT
+        run: dart run flutter_launcher_icons
+      - name: Analisar código
+        run: flutter analyze --no-fatal-infos
+      - name: Executar testes
+        run: flutter test
+      - name: Gerar APK Android de teste (assinado para depuração)
+        run: flutter build apk --debug
+      - name: Preparar arquivo para download
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-debug.apk dist/Juan_Rocha_Boxe_Android_Teste.apk
+          ls -lh dist/Juan_Rocha_Boxe_Android_Teste.apk
+      - name: Disponibilizar APK para baixar
+        uses: actions/upload-artifact@v4
+        with:
+          name: Juan-Rocha-Boxe-APK-Android
+          path: dist/Juan_Rocha_Boxe_Android_Teste.apk
+          if-no-files-found: error
+          retention-days: 14

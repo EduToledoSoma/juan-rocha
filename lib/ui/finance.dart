@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import '../core/repository.dart';
+import '../core/export_service.dart';
 import '../core/utils.dart';
 import 'forms.dart';
 import 'style.dart';
@@ -14,7 +14,7 @@ class FinanceTab extends StatefulWidget {
 class _FinanceTabState extends State<FinanceTab> {
   late Future<_FinanceModel> future;
   @override void initState(){super.initState();reload();}
-  void reload()=>future=_FinanceModel.load();
+  void reload() { future=_FinanceModel.load(); }
 
   Future<void> addMovement() async {
     final values=await editEntity(context,title:'Nova movimentação',fields:[
@@ -75,7 +75,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
   String filter='open';
   late Future<List<Map<String,Object?>>> future;
   @override void initState(){super.initState();reload();}
-  void reload()=>future=Repository.instance.invoiceList();
+  void reload() { future=Repository.instance.invoiceList(); }
 
   Future<void> newInvoice() async {
     try{
@@ -137,7 +137,8 @@ class _InvoicesPageState extends State<InvoicesPage> {
         pw.Divider(),pw.Text('Total recebido: ${money(payments.fold<int>(0,(a,p)=>a+intValue(p['amount_cents'])))}',style:pw.TextStyle(fontWeight:pw.FontWeight.bold)),
         pw.SizedBox(height:22),pw.Text('Registro de pagamento gerado pelo JR Boxe Gestão.',style:const pw.TextStyle(fontSize:9)),
       ])));
-      await Printing.sharePdf(bytes:await pdf.save(),filename:'recibo_juan_rocha_${invoice['id']}.pdf');
+      final saved=await deliverExport(filename:'recibo_juan_rocha_${invoice['id']}.pdf',bytes:await pdf.save());
+      if(saved!=null && mounted)showJrOk(context,'Recibo salvo em: $saved');
     }catch(e){showJrError(context,e);}
   }
   Future<void> cancel(Map<String,Object?> invoice)async{
