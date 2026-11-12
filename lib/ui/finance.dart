@@ -6,6 +6,7 @@ import '../core/export_service.dart';
 import '../core/utils.dart';
 import 'forms.dart';
 import 'style.dart';
+import 'recurring.dart';
 
 class FinanceTab extends StatefulWidget {
   const FinanceTab({super.key});
@@ -15,6 +16,11 @@ class _FinanceTabState extends State<FinanceTab> {
   late Future<_FinanceModel> future;
   @override void initState(){super.initState();reload();}
   void reload() { future=_FinanceModel.load(); }
+
+  Future<void> openRecurrences() async {
+    await Navigator.push(context,MaterialPageRoute(builder:(_)=>const RecurringPage()));
+    if(mounted)setState(reload);
+  }
 
   Future<void> addMovement() async {
     final values=await editEntity(context,title:'Nova movimentação',fields:[
@@ -49,6 +55,7 @@ class _FinanceTabState extends State<FinanceTab> {
       JrPanel(child:Row(children:[const Expanded(child:Text('Saldo do mês',style:TextStyle(fontSize:17,fontWeight:FontWeight.w800))),Text(money(received-spent),style:const TextStyle(fontSize:20,color:brandGoldLight,fontWeight:FontWeight.w900))])),
       const SizedBox(height:16),ElevatedButton.icon(onPressed:()async{await Navigator.push(context,MaterialPageRoute(builder:(_)=>const InvoicesPage()));if(mounted)setState(reload);},icon:const Icon(Icons.receipt_long),label:Text('MENSALIDADES  •  ${pending.length} EM ABERTO')),
       const SizedBox(height:10),OutlinedButton.icon(onPressed:addMovement,icon:const Icon(Icons.add),label:const Text('LANÇAR RECEITA OU DESPESA')),
+      const SizedBox(height:10),OutlinedButton.icon(onPressed:openRecurrences,icon:const Icon(Icons.autorenew),label:const Text('GERENCIAR RECORRENCIAS MENSAIS')), 
       const SizedBox(height:24),const Text('Movimentações recentes',style:TextStyle(fontSize:18,fontWeight:FontWeight.w800)),
       const SizedBox(height:10),
       if(m.finance.isEmpty)const JrEmpty(text:'Nenhuma movimentação. Registre a primeira despesa ou pagamento.',icon:Icons.account_balance_wallet_outlined),
@@ -146,7 +153,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
     try{await Repository.instance.changeInvoiceStatus(intValue(invoice['id']),'cancelled');if(!mounted)return;showJrOk(context,'Mensalidade cancelada');setState(reload);}catch(e){showJrError(context,e);}
   }
   @override Widget build(BuildContext context)=>Scaffold(
-    appBar:AppBar(title:const Text('Mensalidades')),floatingActionButton:FloatingActionButton.extended(onPressed:newInvoice,icon:const Icon(Icons.add),label:const Text('MENSALIDADE')),
+    appBar:AppBar(title:const Text('Mensalidades'),actions:[IconButton(tooltip:'Recorrências mensais',icon:const Icon(Icons.autorenew),onPressed:() async {await Navigator.push(context,MaterialPageRoute(builder:(_)=>const RecurringPage()));if(mounted)setState(reload);})]),floatingActionButton:FloatingActionButton.extended(onPressed:newInvoice,icon:const Icon(Icons.add),label:const Text('MENSALIDADE')),
     body:FutureBuilder<List<Map<String,Object?>>>(future:future,builder:(context,s){
       if(s.hasError)return JrEmpty(text:'Erro: ${s.error}');
       if(!s.hasData)return const Center(child:CircularProgressIndicator());

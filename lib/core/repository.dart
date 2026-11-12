@@ -143,6 +143,106 @@ class Repository {
     });
   }
 
+  // Recorrencia mensal. Executa localmente ao abrir o aplicativo; nunca marca
+  // mensalidades como pagas. SQLite UNIQUE protege contra duplicacao de faturas.
+  Future<List<Map<String,Object?>>> recurringRules() async =>
+      (await db).query('recurring_rules', orderBy:'active DESC,id DESC');
+
+  Future<int> addRecurringRule({required String kind, int? studentId,
+      required String description, required String category,
+      required int amountCents, required int dueDay,
+      required String startMonth, String? endMonth}) async {
+    if (!['invoice','expense'].contains(kind) || amountCents<=0 ||
+        dueDay<1 || dueDay>31 ||
+        !RegExp(r'^\d{4}-(0[1-9]|1[0-2])$').hasMatch(startMonth) ||
+        (endMonth!=null && endMonth.isNotEmpty &&
+          (!RegExp(r'^\d{4}-(0[1-9]|1[0-2])$').hasMatch(endMonth) || endMonth.compareTo(startMonth)<0)) ||
+        (kind=='invoice' && studentId==null)) {
+      throw StateError('Confira aluno, valor, dia e periodo da recorrencia.');
+    }
+    final d=await db;
+    final newId=await d.insert('recurring_rules',{
+      'kind':kind,'student_id':kind=='invoice'?studentId:null,
+      'description':description,'category':category,'amount_cents':amountCents,
+      'due_day':dueDay,'start_month':startMonth,
+      'end_month':endMonth?.isEmpty==true?null:endMonth,
+    });
+    await _audit(d,'recurring_rules','insert','$newId');
+    await generateRecurringEntries();
+    return newId;
+  }
+
+  Future<void> toggleRecurringRule(int id, bool active) async {
+    final d=await db;
+    await d.transaction((txn) async {
+      await txn.update('recurring_rules',{'active':active?1:0},where:'id=?',whereArgs:[id]);
+      await _audit(txn,'recurring_rules',active?'resume':'pause','$id');
+    });
+    if(active) await generateRecurringEntries();
+  }
+
+  static String _dateForMonth(String month, int day) {
+    final parts=month.split('-');
+    final year=int.parse(parts[0]);
+    final m=int.parse(parts[1]);
+    final last=DateTime(year,m+1,0).day;
+    return '$month-${(day>last?last:day).toString().padLeft(2,'0')}';
+  }
+
+  Future<int> generateRecurringEntries() async {
+    final d=await db;
+    final current=monthKey();
+    var total=0;
+    await d.transaction((txn) async {
+      final rules=await txn.query('recurring_rules',where:'active=1');
+      for(final rule in rules) {
+        var month=textValue(rule['start_month']);
+        final end=textValue(rule['end_month']);
+        // Safety cap: no retroactive unbounded generation.
+        for(var i=0;i<120 && month.compareTo(current)<=0 &&
+            (end.isEmpty || month.compareTo(end)<=0);i++) {
+          final due=_dateForMonth(month,intValue(rule['due_day']));
+          if(rule['kind']=='invoice') {
+            final sid=intValue(rule['student_id']);
+            final active=await txn.query('students',columns:['id','plan_id'],
+                where:'id=? AND status=?',whereArgs:[sid,'active']);
+            if(active.isNotEmpty) {
+              final existing=await txn.query('invoices',columns:['id'],
+                  where:'student_id=? AND competency=?',whereArgs:[sid,month]);
+              if(existing.isEmpty) {
+                await txn.insert('invoices',{
+                  'student_id':sid,'plan_id':active.first['plan_id'],
+                  'competency':month,'due_date':due,
+                  'amount_cents':rule['amount_cents'],
+                  'notes':'Gerada pela recorrencia #${rule['id']}',
+                });
+                total++;
+              }
+            }
+          } else if(due.compareTo(todayIso())<=0) {
+            // Despesas agendadas so entram no caixa ao atingir sua data.
+            final existing=await txn.query('finance',columns:['id'],
+                where:'source_type=? AND source_id=?',
+                whereArgs:['recurring_${rule['id']}_$month',intValue(rule['id'])]);
+            if(existing.isEmpty) {
+              await txn.insert('finance',{
+                'direction':'expense','category':rule['category'],
+                'description':rule['description'],'amount_cents':rule['amount_cents'],
+                'occurred_at':due,'source_type':'recurring_${rule['id']}_$month',
+                'source_id':rule['id'],
+              });
+              total++;
+            }
+          }
+          final dt=DateTime.parse('$month-01');
+          month=monthKey(DateTime(dt.year,dt.month+1,1));
+        }
+      }
+      if(total>0) await _audit(txn,'recurring_rules','generate','$total lancamentos');
+    });
+    return total;
+  }
+
   Future<Map<String,Object?>> dashboard() async {
     final d=await db;
     final students=Sqflite.firstIntValue(await d.rawQuery("SELECT COUNT(*) FROM students WHERE status='active'"))??0;

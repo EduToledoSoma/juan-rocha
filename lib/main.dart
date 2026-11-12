@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/db.dart';
+import 'core/repository.dart';
 import 'ui/app_shell.dart';
 import 'ui/style.dart';
 
@@ -43,6 +44,7 @@ class _StartupGateState extends State<_StartupGate> {
   Future<void> _initialize() async {
     await initializeDateFormatting('pt_BR');
     await AppDb.instance.database;
+    await Repository.instance.generateRecurringEntries();
   }
 
   void _retry() {

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -35,9 +36,14 @@ class AppDb {
       dir = await getDatabasesPath();
     }
     await Directory(dir).create(recursive: true);
+    final existingDb = File(p.join(dir, 'juan_rocha_boxe.sqlite'));
+    final backupMarker = File(p.join(dir, '.recurrence_backup_v2_complete'));
+    if (await existingDb.exists() && !await backupMarker.exists()) {
+      await _backupExistingDatabase(dir);
+    }
     _db = await openDatabase(
       p.join(dir, 'juan_rocha_boxe.sqlite'),
-      version: 1,
+      version: 2,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys=ON');
       },
@@ -45,10 +51,57 @@ class AppDb {
         for (final sql in schema) {
           await db.execute(sql);
         }
+        await db.execute(recurringSchema);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute(recurringSchema);
+        }
       },
     );
+    if (Platform.isLinux || Platform.isWindows) {
+      await File(p.join(dir, '.recurrence_backup_v2_complete')).writeAsString('schema-v2');
+    }
     return _db!;
   }
+
+  // A copia e feita antes de qualquer migracao, com o aplicativo fechado.
+  // Mantem o banco e os arquivos auxiliares WAL/SHM para restauracao consistente.
+  Future<void> _backupExistingDatabase(String dir) async {
+    if (!(Platform.isLinux || Platform.isWindows)) return;
+    final file = File(p.join(dir, 'juan_rocha_boxe.sqlite'));
+    if (!await file.exists()) return;
+    final backups = Directory(p.join(dir, 'backups'));
+    await backups.create(recursive: true);
+    final stamp = DateTime.now().toUtc().toIso8601String().replaceAll(RegExp(r'[^0-9]'), '');
+    final destination = Directory(p.join(backups.path, 'antes_da_atualizacao_$stamp'));
+    try {
+      await destination.create(recursive: true);
+      for (final suffix in <String>['', '-wal', '-shm']) {
+        final source = File('${file.path}$suffix');
+        if (await source.exists()) {
+          await source.copy(p.join(destination.path, 'juan_rocha_boxe.sqlite$suffix'));
+        }
+      }
+    } catch (e) {
+      debugPrint('Falha ao criar backup local antes da migracao: $e');
+      rethrow; // Nunca migrar sem copia de seguranca.
+    }
+  }
+
+  static const recurringSchema = '''CREATE TABLE IF NOT EXISTS recurring_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL CHECK(kind IN ('invoice','expense')),
+    student_id INTEGER REFERENCES students(id) ON DELETE RESTRICT,
+    description TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT 'Despesas fixas',
+    amount_cents INTEGER NOT NULL CHECK(amount_cents>0),
+    due_day INTEGER NOT NULL CHECK(due_day BETWEEN 1 AND 31),
+    start_month TEXT NOT NULL, end_month TEXT,
+    active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK(kind != 'invoice' OR student_id IS NOT NULL)
+  )''';
 
   static const schema = <String>[
     '''CREATE TABLE plans (

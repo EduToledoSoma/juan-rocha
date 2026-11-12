@@ -1,0 +1,74 @@
+name: Atualizar Juan Rocha Boxe - Linux e Windows
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Preparar plataforma e icone
+        shell: pwsh
+        run: |
+          flutter config --enable-windows-desktop
+          flutter create --platforms=windows --project-name juan_rocha_boxe .
+          flutter pub get
+          Copy-Item 'assets/brand/app_icon_windows.ico' 'windows/runner/resources/app_icon.ico' -Force
+      - name: Analisar e compilar Windows
+        shell: pwsh
+        run: |
+          flutter analyze --no-fatal-infos
+          flutter test
+          flutter build windows --release
+          Copy-Item 'assets/brand/app_icon_windows.ico' 'build/windows/x64/runner/Release/app_icon.ico' -Force
+      - name: Gerar Setup de atualizacao
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          $compiler = @('C:\Program Files (x86)\Inno Setup 6\ISCC.exe','C:\Program Files\Inno Setup 6\ISCC.exe') | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $compiler) { throw 'Inno Setup nao encontrado' }
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          & $compiler 'installer/juan_rocha.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Erro gerando Setup' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Juan-Rocha-Boxe-Windows-Atualizacao-1_1
+          path: dist/Juan_Rocha_Boxe_Setup.exe
+          if-no-files-found: error
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bibliotecas Linux Flutter
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libsqlite3-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Analisar e compilar Linux
+        run: |
+          flutter config --enable-linux-desktop
+          flutter create --platforms=linux --project-name juan_rocha_boxe .
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test
+          flutter build linux --release
+      - name: Preparar pacote clicavel
+        run: |
+          mkdir -p dist/Juan_Rocha_Boxe_Linux
+          cp -a build/linux/x64/release/bundle/. dist/Juan_Rocha_Boxe_Linux/
+          cp assets/brand/icone_ios.png dist/Juan_Rocha_Boxe_Linux/juan_rocha_boxe.png
+          cp scripts/instalar_no_menu_linux.sh dist/Juan_Rocha_Boxe_Linux/instalar_no_menu_linux.sh
+          cd dist && tar -czf Juan_Rocha_Boxe_Linux_Atualizacao.tar.gz Juan_Rocha_Boxe_Linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Juan-Rocha-Boxe-Linux-Atualizacao-1_1
+          path: dist/Juan_Rocha_Boxe_Linux_Atualizacao.tar.gz
+          if-no-files-found: error

@@ -1,7 +1,7 @@
 ; Instalador de Juan Rocha Boxe - compilado a partir do Flutter Windows Release.
 ; O GitHub Actions cria o Windows Release e executa o Inno Setup.
 #define AppName "Juan Rocha Boxe"
-#define AppVersion "1.0.0"
+#define AppVersion "1.1.0"
 #define AppExe "juan_rocha_boxe.exe"
 
 [Setup]
@@ -24,6 +24,8 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 CloseApplications=yes
 RestartApplications=no
+UsePreviousAppDir=yes
+Uninstallable=yes
 
 [Files]
 Source: "..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
